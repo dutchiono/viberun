@@ -1,0 +1,1294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VIBE://RUN - Neural Coding RPG</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background: #0a0a0f;
+            color: #00ff00;
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        /* CRT Scanline Effect */
+        body::after {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: repeating-linear-gradient(
+                0deg,
+                rgba(0, 255, 0, 0.03),
+                rgba(0, 255, 0, 0.03) 1px,
+                transparent 1px,
+                transparent 2px
+            );
+            pointer-events: none;
+            z-index: 9999;
+        }
+
+        /* Registration Screen */
+        #registration-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: #0a0a0f;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            padding: 2rem;
+        }
+
+        #registration-screen.hidden {
+            display: none;
+        }
+
+        #ascii-logo {
+            color: #00ff00;
+            text-shadow: 0 0 20px #00ff00;
+            font-size: 0.8rem;
+            line-height: 1.2;
+            margin-bottom: 2rem;
+            white-space: pre;
+            text-align: center;
+        }
+
+        #registration-prompt {
+            font-size: 1.2rem;
+            margin-bottom: 1rem;
+            text-shadow: 0 0 10px #00ff00;
+        }
+
+        #agent-name-input {
+            background: transparent;
+            border: 2px solid #00ff00;
+            color: #00ff00;
+            font-family: 'Courier New', monospace;
+            font-size: 1.5rem;
+            padding: 0.5rem 1rem;
+            text-align: center;
+            width: 400px;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.5);
+            outline: none;
+        }
+
+        #agent-name-input::placeholder {
+            color: rgba(0, 255, 0, 0.4);
+        }
+
+        .blink {
+            animation: blink 1s infinite;
+        }
+
+        @keyframes blink {
+            0%, 49% { opacity: 1; }
+            50%, 100% { opacity: 0; }
+        }
+
+        /* Main Game Container */
+        #game-container {
+            display: none;
+            height: 100vh;
+            flex-direction: column;
+        }
+
+        #game-container.active {
+            display: flex;
+        }
+
+        /* Header */
+        #header {
+            background: #0f0f1a;
+            border-bottom: 2px solid #00ff00;
+            padding: 0.75rem 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.3);
+        }
+
+        #header h1 {
+            font-size: 1.5rem;
+            color: #00ffff;
+            text-shadow: 0 0 15px #00ffff;
+        }
+
+        #header-stats {
+            display: flex;
+            gap: 2rem;
+            font-size: 1rem;
+        }
+
+        .stat {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .stat-label {
+            color: #00ff00;
+            opacity: 0.7;
+        }
+
+        .stat-value {
+            color: #00ffff;
+            font-weight: bold;
+            text-shadow: 0 0 10px #00ffff;
+        }
+
+        /* Main Content Area */
+        #main-content {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* District Map Panel */
+        #district-panel {
+            width: 30%;
+            background: #0f0f1a;
+            border-right: 2px solid #00ff00;
+            padding: 1rem;
+            overflow-y: auto;
+            box-shadow: inset 0 0 20px rgba(0, 255, 0, 0.1);
+        }
+
+        #district-panel h2 {
+            color: #00ffff;
+            margin-bottom: 1rem;
+            font-size: 1.2rem;
+            text-shadow: 0 0 10px #00ffff;
+            border-bottom: 1px solid #00ff00;
+            padding-bottom: 0.5rem;
+        }
+
+        .district-item {
+            padding: 0.75rem;
+            margin-bottom: 0.5rem;
+            border: 1px solid #00ff00;
+            cursor: pointer;
+            transition: all 0.3s;
+            position: relative;
+        }
+
+        .district-item:hover {
+            background: rgba(0, 255, 0, 0.1);
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.3);
+        }
+
+        .district-item.cleared {
+            border-color: #00ff00;
+            color: #00ff00;
+        }
+
+        .district-item.current {
+            border-color: #00ffff;
+            color: #00ffff;
+            background: rgba(0, 255, 255, 0.1);
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.4);
+        }
+
+        .district-item.locked {
+            border-color: #666;
+            color: #666;
+            cursor: not-allowed;
+        }
+
+        .district-name {
+            font-weight: bold;
+            font-size: 1rem;
+        }
+
+        .district-baron {
+            font-size: 0.8rem;
+            opacity: 0.7;
+            margin-top: 0.25rem;
+        }
+
+        .district-status {
+            position: absolute;
+            right: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 1.2rem;
+        }
+
+        /* Terminal Panel */
+        #terminal-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: #000;
+            padding: 1rem;
+        }
+
+        #terminal-output {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem;
+            font-size: 0.95rem;
+            line-height: 1.5;
+            color: #00ff00;
+            text-shadow: 0 0 5px rgba(0, 255, 0, 0.5);
+        }
+
+        #terminal-output::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        #terminal-output::-webkit-scrollbar-track {
+            background: #0a0a0f;
+        }
+
+        #terminal-output::-webkit-scrollbar-thumb {
+            background: #00ff00;
+            box-shadow: 0 0 10px #00ff00;
+        }
+
+        .terminal-line {
+            margin-bottom: 0.25rem;
+        }
+
+        .terminal-prompt {
+            color: #00ffff;
+        }
+
+        .terminal-error {
+            color: #ff0000;
+            text-shadow: 0 0 10px #ff0000;
+        }
+
+        .terminal-success {
+            color: #00ff00;
+            text-shadow: 0 0 10px #00ff00;
+        }
+
+        .terminal-warning {
+            color: #ffff00;
+            text-shadow: 0 0 10px #ffff00;
+        }
+
+        .terminal-info {
+            color: #00ffff;
+        }
+
+        .terminal-system {
+            color: #00ff00;
+            opacity: 0.8;
+        }
+
+        #terminal-input-container {
+            display: flex;
+            align-items: center;
+            padding: 0.5rem 1rem;
+            border-top: 1px solid #00ff00;
+            background: rgba(0, 255, 0, 0.05);
+        }
+
+        #terminal-prompt-symbol {
+            color: #00ffff;
+            margin-right: 0.5rem;
+            font-weight: bold;
+        }
+
+        #terminal-input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: #00ff00;
+            font-family: 'Courier New', monospace;
+            font-size: 1rem;
+            outline: none;
+            text-shadow: 0 0 5px rgba(0, 255, 0, 0.5);
+        }
+
+        .cursor {
+            display: inline-block;
+            width: 8px;
+            height: 16px;
+            background: #00ff00;
+            animation: blink 1s infinite;
+            margin-left: 2px;
+        }
+
+        /* Timeline Panel */
+        #timeline-panel {
+            background: #0f0f1a;
+            border-top: 2px solid #00ff00;
+            padding: 1rem;
+            height: 150px;
+            overflow-y: auto;
+            box-shadow: inset 0 0 20px rgba(0, 255, 0, 0.1);
+        }
+
+        #timeline-panel h3 {
+            color: #00ffff;
+            margin-bottom: 0.75rem;
+            font-size: 1rem;
+            text-shadow: 0 0 10px #00ffff;
+        }
+
+        .timeline-item {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 0.5rem;
+            margin-bottom: 0.5rem;
+            border: 1px solid #00ff00;
+            background: rgba(0, 255, 0, 0.05);
+        }
+
+        .timeline-label {
+            flex: 0 0 200px;
+            font-size: 0.85rem;
+        }
+
+        .timeline-progress {
+            flex: 1;
+            height: 20px;
+            background: #0a0a0f;
+            border: 1px solid #00ff00;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .timeline-progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #00ff00, #00ffff);
+            box-shadow: 0 0 10px #00ff00;
+            transition: width 0.5s linear;
+        }
+
+        .timeline-timer {
+            flex: 0 0 60px;
+            text-align: right;
+            color: #00ffff;
+        }
+
+        /* Flash Effects */
+        @keyframes flash-green {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; background: rgba(0, 255, 0, 0.2); }
+        }
+
+        @keyframes flash-red {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; background: rgba(255, 0, 0, 0.2); }
+        }
+
+        .flash-success {
+            animation: flash-green 0.5s;
+        }
+
+        .flash-error {
+            animation: flash-red 0.5s;
+        }
+
+        /* District Cleared Overlay */
+        #district-cleared-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 255, 0, 0.9);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+            animation: flash-green 1s;
+        }
+
+        #district-cleared-overlay.show {
+            display: flex;
+        }
+
+        #district-cleared-text {
+            font-size: 3rem;
+            color: #000;
+            font-weight: bold;
+            text-align: center;
+            white-space: pre;
+        }
+
+        /* Loading Spinner */
+        .loading {
+            display: inline-block;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Typewriter Effect */
+        @keyframes typewriter {
+            from { width: 0; }
+            to { width: 100%; }
+        }
+
+        .typewriter {
+            overflow: hidden;
+            white-space: nowrap;
+            animation: typewriter 2s steps(40) forwards;
+        }
+
+        /* Quiz Mode Styles */
+        .quiz-question {
+            border: 2px solid #00ffff;
+            padding: 1rem;
+            margin: 1rem 0;
+            background: rgba(0, 255, 255, 0.05);
+        }
+
+        .quiz-option {
+            padding: 0.5rem;
+            margin: 0.5rem 0;
+            border: 1px solid #00ff00;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .quiz-option:hover {
+            background: rgba(0, 255, 0, 0.1);
+            box-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
+        }
+
+        /* Particle Effect */
+        .particle {
+            position: fixed;
+            width: 4px;
+            height: 4px;
+            background: #ffd700;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 3000;
+            box-shadow: 0 0 10px #ffd700;
+        }
+
+        @keyframes particle-float {
+            0% {
+                transform: translateY(0) translateX(0);
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(-100px) translateX(var(--drift));
+                opacity: 0;
+            }
+        }
+
+        /* Responsive Design */
+        @media (max-width: 1024px) {
+            #district-panel {
+                width: 25%;
+            }
+        }
+
+        @media (max-width: 768px) {
+            #header-stats {
+                gap: 1rem;
+                font-size: 0.85rem;
+            }
+
+            #district-panel {
+                display: none;
+            }
+
+            #terminal-output {
+                font-size: 0.85rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Registration Screen -->
+    <div id="registration-screen">
+        <div id="ascii-logo">
+ ██╗   ██╗██╗██████╗ ███████╗    ██████╗ ██╗   ██╗███╗   ██╗
+ ██║   ██║██║██╔══██╗██╔════╝    ██╔══██╗██║   ██║████╗  ██║
+ ██║   ██║██║██████╔╝█████╗      ██████╔╝██║   ██║██╔██╗ ██║
+ ╚██╗ ██╔╝██║██╔══██╗██╔══╝      ██╔══██╗██║   ██║██║╚██╗██║
+  ╚████╔╝ ██║██████╔╝███████╗    ██║  ██║╚██████╔╝██║ ╚████║
+   ╚═══╝  ╚═╝╚═════╝ ╚══════╝    ╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═══╝
+        </div>
+        <div id="registration-prompt">ENTER AGENT DESIGNATION: <span class="blink">_</span></div>
+        <input type="text" id="agent-name-input" placeholder="YOUR_NAME_HERE" autocomplete="off" />
+    </div>
+
+    <!-- District Cleared Overlay -->
+    <div id="district-cleared-overlay">
+        <div id="district-cleared-text">
+╔══════════════════════════════════╗
+║   DISTRICT CLEARED               ║
+║   ACCESS GRANTED TO NEXT ZONE    ║
+╚══════════════════════════════════╝
+        </div>
+    </div>
+
+    <!-- Main Game Container -->
+    <div id="game-container">
+        <!-- Header -->
+        <div id="header">
+            <h1>VIBE://RUN v1.0</h1>
+            <div id="header-stats">
+                <div class="stat">
+                    <span class="stat-label">AGENT:</span>
+                    <span class="stat-value" id="agent-name">UNKNOWN</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">$MESH:</span>
+                    <span class="stat-value" id="mesh-balance">0</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">LEVEL:</span>
+                    <span class="stat-value" id="agent-level">1</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div id="main-content">
+            <!-- District Map Panel -->
+            <div id="district-panel">
+                <h2>DISTRICT MAP</h2>
+                <div id="district-list"></div>
+            </div>
+
+            <!-- Terminal Panel -->
+            <div id="terminal-panel">
+                <div id="terminal-output"></div>
+                <div id="terminal-input-container">
+                    <span id="terminal-prompt-symbol">></span>
+                    <input type="text" id="terminal-input" autocomplete="off" />
+                    <span class="cursor"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Timeline Panel -->
+        <div id="timeline-panel">
+            <h3>AGENT TIMELINE</h3>
+            <div id="timeline-list">
+                <div style="color: #666; font-style: italic;">No active operations...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const API_BASE_URL = 'http://localhost:3001';
+
+        // Game State
+        let gameState = {
+            agentId: null,
+            agentName: null,
+            currentDistrict: null,
+            districts: [],
+            commandHistory: [],
+            historyIndex: -1,
+            quizMode: false,
+            currentQuiz: null,
+            currentQuestionIndex: 0,
+            deployedAgents: []
+        };
+
+        // DOM Elements
+        const registrationScreen = document.getElementById('registration-screen');
+        const agentNameInput = document.getElementById('agent-name-input');
+        const gameContainer = document.getElementById('game-container');
+        const terminalOutput = document.getElementById('terminal-output');
+        const terminalInput = document.getElementById('terminal-input');
+        const districtList = document.getElementById('district-list');
+        const timelineList = document.getElementById('timeline-list');
+        const districtClearedOverlay = document.getElementById('district-cleared-overlay');
+
+        // Header Stats
+        const headerAgentName = document.getElementById('agent-name');
+        const headerMeshBalance = document.getElementById('mesh-balance');
+        const headerAgentLevel = document.getElementById('agent-level');
+
+        // Initialize
+        window.addEventListener('DOMContentLoaded', () => {
+            checkExistingAgent();
+            setupEventListeners();
+        });
+
+        function checkExistingAgent() {
+            const savedAgentId = localStorage.getItem('viberun_agent_id');
+            const savedAgentName = localStorage.getItem('viberun_agent_name');
+
+            if (savedAgentId && savedAgentName) {
+                gameState.agentId = savedAgentId;
+                gameState.agentName = savedAgentName;
+                startGame();
+            } else {
+                agentNameInput.focus();
+            }
+        }
+
+        function setupEventListeners() {
+            // Registration
+            agentNameInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter' && agentNameInput.value.trim()) {
+                    registerAgent(agentNameInput.value.trim());
+                }
+            });
+
+            // Terminal Input
+            terminalInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    const command = terminalInput.value.trim();
+                    if (command) {
+                        executeCommand(command);
+                        terminalInput.value = '';
+                    }
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    navigateHistory('up');
+                } else if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    navigateHistory('down');
+                }
+            });
+        }
+
+        // API Functions
+        async function apiCall(endpoint, method = 'GET', body = null) {
+            try {
+                const options = {
+                    method,
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                };
+
+                if (body) {
+                    options.body = JSON.stringify(body);
+                }
+
+                const response = await fetch(`${API_BASE_URL}${endpoint}`, options);
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'API request failed');
+                }
+
+                return data;
+            } catch (error) {
+                console.error('API Error:', error);
+                throw error;
+            }
+        }
+
+        async function registerAgent(name) {
+            try {
+                printToTerminal('INITIALIZING AGENT REGISTRATION...', 'system');
+                const data = await apiCall('/api/agent/register', 'POST', { name });
+
+                gameState.agentId = data.agent.id;
+                gameState.agentName = data.agent.name;
+
+                localStorage.setItem('viberun_agent_id', data.agent.id);
+                localStorage.setItem('viberun_agent_name', data.agent.name);
+
+                registrationScreen.classList.add('hidden');
+                startGame();
+            } catch (error) {
+                printToTerminal(`REGISTRATION FAILED: ${error.message}`, 'error');
+                agentNameInput.value = '';
+                agentNameInput.focus();
+            }
+        }
+
+        async function startGame() {
+            gameContainer.classList.add('active');
+            headerAgentName.textContent = gameState.agentName;
+
+            printToTerminal('═══════════════════════════════════════════════════════════', 'system');
+            printToTerminal(' ██╗   ██╗██╗██████╗ ███████╗    ██████╗ ██╗   ██╗███╗   ██╗', 'system');
+            printToTerminal(' ██║   ██║██║██╔══██╗██╔════╝    ██╔══██╗██║   ██║████╗  ██║', 'system');
+            printToTerminal(' ██║   ██║██║██████╔╝█████╗      ██████╔╝██║   ██║██╔██╗ ██║', 'system');
+            printToTerminal(' ╚██╗ ██╔╝██║██╔══██╗██╔══╝      ██╔══██╗██║   ██║██║╚██╗██║', 'system');
+            printToTerminal('  ╚████╔╝ ██║██████╔╝███████╗    ██║  ██║╚██████╔╝██║ ╚████║', 'system');
+            printToTerminal('   ╚═══╝  ╚═╝╚═════╝ ╚══════╝    ╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═══╝', 'system');
+            printToTerminal('═══════════════════════════════════════════════════════════', 'system');
+            printToTerminal('', 'system');
+            printToTerminal(`WELCOME, AGENT ${gameState.agentName.toUpperCase()}`, 'success');
+            printToTerminal('NEURAL INTERFACE ACTIVE. THE MESH AWAITS.', 'system');
+            printToTerminal('', 'system');
+            printToTerminal('Type "help" for available commands.', 'info');
+            printToTerminal('', 'system');
+
+            await loadDistricts();
+            await updateAgentStatus();
+            startStatusPolling();
+
+            terminalInput.focus();
+        }
+
+        async function loadDistricts() {
+            try {
+                const data = await apiCall('/api/district');
+                gameState.districts = data.districts;
+                renderDistricts();
+
+                // Set first unlocked district as current
+                const firstUnlocked = gameState.districts.find(d => !d.is_locked);
+                if (firstUnlocked) {
+                    gameState.currentDistrict = firstUnlocked.slug;
+                }
+            } catch (error) {
+                printToTerminal(`ERROR LOADING DISTRICTS: ${error.message}`, 'error');
+            }
+        }
+
+        async function updateAgentStatus() {
+            try {
+                const data = await apiCall(`/api/agent/${gameState.agentId}/status`);
+                headerMeshBalance.textContent = data.agent.mesh_balance.toLocaleString();
+                headerAgentLevel.textContent = data.agent.level;
+
+                // Update deployed agents
+                gameState.deployedAgents = data.deployed_agents || [];
+                renderTimeline();
+            } catch (error) {
+                console.error('Error updating agent status:', error);
+            }
+        }
+
+        function startStatusPolling() {
+            setInterval(() => {
+                updateAgentStatus();
+            }, 10000); // Poll every 10 seconds
+        }
+
+        // Terminal Functions
+        function printToTerminal(text, type = 'normal') {
+            const line = document.createElement('div');
+            line.className = `terminal-line terminal-${type}`;
+            line.textContent = text;
+            terminalOutput.appendChild(line);
+            terminalOutput.scrollTop = terminalOutput.scrollHeight;
+        }
+
+        function clearTerminal() {
+            terminalOutput.innerHTML = '';
+        }
+
+        function navigateHistory(direction) {
+            if (gameState.commandHistory.length === 0) return;
+
+            if (direction === 'up') {
+                if (gameState.historyIndex < gameState.commandHistory.length - 1) {
+                    gameState.historyIndex++;
+                    terminalInput.value = gameState.commandHistory[gameState.commandHistory.length - 1 - gameState.historyIndex];
+                }
+            } else if (direction === 'down') {
+                if (gameState.historyIndex > 0) {
+                    gameState.historyIndex--;
+                    terminalInput.value = gameState.commandHistory[gameState.commandHistory.length - 1 - gameState.historyIndex];
+                } else if (gameState.historyIndex === 0) {
+                    gameState.historyIndex = -1;
+                    terminalInput.value = '';
+                }
+            }
+        }
+
+        // Command Execution
+        async function executeCommand(commandStr) {
+            gameState.commandHistory.push(commandStr);
+            gameState.historyIndex = -1;
+
+            printToTerminal(`> ${commandStr}`, 'prompt');
+
+            const parts = commandStr.split(' ');
+            const command = parts[0].toLowerCase();
+            const args = parts.slice(1);
+
+            try {
+                switch (command) {
+                    case 'help':
+                        showHelp();
+                        break;
+                    case 'status':
+                        await showStatus();
+                        break;
+                    case 'districts':
+                        await showDistricts();
+                        break;
+                    case 'scan':
+                        await scanServers();
+                        break;
+                    case 'cd':
+                        changeDistrict(args[0]);
+                        break;
+                    case 'probe':
+                        await runOperation('probe', args[0]);
+                        break;
+                    case 'sync':
+                        await runOperation('sync', args[0]);
+                        break;
+                    case 'drain':
+                        await runOperation('drain', args[0]);
+                        break;
+                    case 'quiz':
+                        await startQuiz();
+                        break;
+                    case 'answer':
+                        await submitAnswer(args);
+                        break;
+                    case 'balance':
+                        showBalance();
+                        break;
+                    case 'leaderboard':
+                        await showLeaderboard();
+                        break;
+                    case 'deploy':
+                        await deployAgent(args[0], args[1]);
+                        break;
+                    case 'clear':
+                        clearTerminal();
+                        break;
+                    default:
+                        printToTerminal(`UNKNOWN COMMAND: ${command}`, 'error');
+                        printToTerminal('Type "help" for available commands.', 'info');
+                }
+            } catch (error) {
+                printToTerminal(`ERROR: ${error.message}`, 'error');
+            }
+        }
+
+        function showHelp() {
+            printToTerminal('═══════════════════════════════════════════', 'info');
+            printToTerminal('  AVAILABLE COMMANDS', 'info');
+            printToTerminal('═══════════════════════════════════════════', 'info');
+            printToTerminal('  help                    - Show this help message', 'system');
+            printToTerminal('  status                  - Show agent statistics', 'system');
+            printToTerminal('  districts               - List all districts', 'system');
+            printToTerminal('  cd <district>           - Switch to a district', 'system');
+            printToTerminal('  scan                    - Scan current district servers', 'system');
+            printToTerminal('  probe <server_id>       - Run PROBE operation', 'system');
+            printToTerminal('  sync <server_id>        - Run SYNC operation', 'system');
+            printToTerminal('  drain <server_id>       - Run DRAIN operation', 'system');
+            printToTerminal('  quiz                    - Start district quiz', 'system');
+            printToTerminal('  answer <id> <answer>    - Submit quiz answer', 'system');
+            printToTerminal('  deploy <server> <type>  - Deploy autonomous agent', 'system');
+            printToTerminal('  balance                 - Show $MESH balance', 'system');
+            printToTerminal('  leaderboard             - Show top agents', 'system');
+            printToTerminal('  clear                   - Clear terminal', 'system');
+            printToTerminal('═══════════════════════════════════════════', 'info');
+        }
+
+        async function showStatus() {
+            try {
+                const data = await apiCall(`/api/agent/${gameState.agentId}/status`);
+                const agent = data.agent;
+
+                printToTerminal('═══════════════════════════════════════════', 'success');
+                printToTerminal('  AGENT STATUS', 'success');
+                printToTerminal('═══════════════════════════════════════════', 'success');
+                printToTerminal(`  Name:          ${agent.name}`, 'system');
+                printToTerminal(`  ID:            ${agent.id}`, 'system');
+                printToTerminal(`  Level:         ${agent.level}`, 'system');
+                printToTerminal(`  $MESH Balance: ${agent.mesh_balance.toLocaleString()}`, 'system');
+                printToTerminal(`  XP:            ${agent.xp}`, 'system');
+                printToTerminal(`  Registered:    ${new Date(agent.created_at).toLocaleString()}`, 'system');
+                printToTerminal('═══════════════════════════════════════════', 'success');
+
+                if (data.deployed_agents && data.deployed_agents.length > 0) {
+                    printToTerminal(`  Active Operations: ${data.deployed_agents.length}`, 'info');
+                }
+            } catch (error) {
+                printToTerminal(`ERROR: ${error.message}`, 'error');
+            }
+        }
+
+        async function showDistricts() {
+            printToTerminal('═══════════════════════════════════════════', 'info');
+            printToTerminal('  DISTRICT MAP - THE MESH', 'info');
+            printToTerminal('═══════════════════════════════════════════', 'info');
+
+            gameState.districts.forEach((district, index) => {
+                const status = district.is_cleared ? '✓' : district.is_locked ? '🔒' : '○';
+                const color = district.is_cleared ? 'success' : district.is_locked ? 'system' : 'warning';
+                const num = String(index + 1).padStart(2, '0');
+                printToTerminal(`  ${num} ${district.name.padEnd(20)} ${status}  [${district.baron_name}]`, color);
+            });
+
+            printToTerminal('═══════════════════════════════════════════', 'info');
+        }
+
+        async function scanServers() {
+            if (!gameState.currentDistrict) {
+                printToTerminal('ERROR: No district selected. Use "cd <district>" first.', 'error');
+                return;
+            }
+
+            try {
+                const data = await apiCall(`/api/district/${gameState.currentDistrict}/servers`);
+                const district = gameState.districts.find(d => d.slug === gameState.currentDistrict);
+
+                printToTerminal('═══════════════════════════════════════════', 'info');
+                printToTerminal(`  SCANNING: ${district.name.toUpperCase()}`, 'info');
+                printToTerminal('═══════════════════════════════════════════', 'info');
+
+                data.servers.forEach(server => {
+                    printToTerminal(`  ID: ${server.id}`, 'system');
+                    printToTerminal(`  Name: ${server.name}`, 'success');
+                    printToTerminal(`  Security: ${server.security_level}`, 'warning');
+                    printToTerminal(`  ─────────────────────────────────────────`, 'system');
+                });
+
+                printToTerminal(`  Total Servers: ${data.servers.length}`, 'info');
+                printToTerminal('═══════════════════════════════════════════', 'info');
+            } catch (error) {
+                printToTerminal(`SCAN FAILED: ${error.message}`, 'error');
+            }
+        }
+
+        function changeDistrict(districtSlug) {
+            if (!districtSlug) {
+                printToTerminal('ERROR: Please specify a district. Example: cd gitclave', 'error');
+                return;
+            }
+
+            const district = gameState.districts.find(d => d.slug === districtSlug.toLowerCase());
+
+            if (!district) {
+                printToTerminal(`ERROR: District "${districtSlug}" not found.`, 'error');
+                return;
+            }
+
+            if (district.is_locked) {
+                printToTerminal(`ACCESS DENIED: ${district.name} is locked.`, 'error');
+                printToTerminal(`Required Level: ${district.level_required}`, 'warning');
+                return;
+            }
+
+            gameState.currentDistrict = district.slug;
+            renderDistricts();
+            printToTerminal(`SWITCHING TO: ${district.name.toUpperCase()}`, 'success');
+            printToTerminal(`Baron: ${district.baron_name}`, 'info');
+        }
+
+        async function runOperation(operation, serverId) {
+            if (!serverId) {
+                printToTerminal(`ERROR: Please specify a server ID. Example: ${operation} 1`, 'error');
+                return;
+            }
+
+            try {
+                printToTerminal(`INITIATING ${operation.toUpperCase()} OPERATION...`, 'warning');
+                const data = await apiCall(`/api/game/${operation}`, 'POST', {
+                    agent_id: gameState.agentId,
+                    server_id: parseInt(serverId)
+                });
+
+                printToTerminal(`${operation.toUpperCase()} SUCCESSFUL!`, 'success');
+                printToTerminal(`Reward: +${data.reward} $MESH`, 'success');
+                printToTerminal(`XP Gained: +${data.xp_gained}`, 'info');
+
+                if (data.message) {
+                    printToTerminal(data.message, 'info');
+                }
+
+                // Particle effect for DRAIN
+                if (operation === 'drain') {
+                    createParticleEffect();
+                }
+
+                // Check for district cleared
+                if (data.district_cleared) {
+                    showDistrictCleared();
+                }
+
+                await updateAgentStatus();
+                await loadDistricts();
+            } catch (error) {
+                printToTerminal(`${operation.toUpperCase()} FAILED: ${error.message}`, 'error');
+                flashEffect('error');
+            }
+        }
+
+        async function startQuiz() {
+            if (!gameState.currentDistrict) {
+                printToTerminal('ERROR: No district selected. Use "cd <district>" first.', 'error');
+                return;
+            }
+
+            try {
+                const data = await apiCall(`/api/quiz/${gameState.currentDistrict}`);
+                gameState.quizMode = true;
+                gameState.currentQuiz = data.questions;
+                gameState.currentQuestionIndex = 0;
+
+                printToTerminal('═══════════════════════════════════════════', 'info');
+                printToTerminal('  QUIZ MODE ACTIVATED', 'info');
+                printToTerminal('═══════════════════════════════════════════', 'info');
+                
+                showNextQuestion();
+            } catch (error) {
+                printToTerminal(`QUIZ INITIALIZATION FAILED: ${error.message}`, 'error');
+            }
+        }
+
+        function showNextQuestion() {
+            if (gameState.currentQuestionIndex >= gameState.currentQuiz.length) {
+                printToTerminal('QUIZ COMPLETED!', 'success');
+                gameState.quizMode = false;
+                gameState.currentQuiz = null;
+                gameState.currentQuestionIndex = 0;
+                return;
+            }
+
+            const question = gameState.currentQuiz[gameState.currentQuestionIndex];
+            printToTerminal('', 'system');
+            printToTerminal(`Question ${gameState.currentQuestionIndex + 1}/${gameState.currentQuiz.length}:`, 'info');
+            printToTerminal(question.question, 'warning');
+            printToTerminal('', 'system');
+
+            if (question.question_type === 'multiple_choice' && question.options) {
+                const options = JSON.parse(question.options);
+                options.forEach((option, index) => {
+                    const letter = String.fromCharCode(65 + index); // A, B, C, D
+                    printToTerminal(`  ${letter}. ${option}`, 'system');
+                });
+                printToTerminal('', 'system');
+                printToTerminal(`Use: answer ${question.id} <A/B/C/D>`, 'info');
+            } else if (question.question_type === 'true_false') {
+                printToTerminal('  T. True', 'system');
+                printToTerminal('  F. False', 'system');
+                printToTerminal('', 'system');
+                printToTerminal(`Use: answer ${question.id} <T/F>`, 'info');
+            } else {
+                printToTerminal(`Use: answer ${question.id} <your answer>`, 'info');
+            }
+        }
+
+        async function submitAnswer(args) {
+            if (!gameState.quizMode) {
+                printToTerminal('ERROR: No active quiz. Use "quiz" to start.', 'error');
+                return;
+            }
+
+            if (args.length < 2) {
+                printToTerminal('ERROR: Please provide question ID and answer.', 'error');
+                return;
+            }
+
+            const questionId = parseInt(args[0]);
+            const answer = args.slice(1).join(' ');
+
+            try {
+                const data = await apiCall('/api/quiz/submit', 'POST', {
+                    agent_id: gameState.agentId,
+                    question_id: questionId,
+                    answer: answer
+                });
+
+                if (data.correct) {
+                    printToTerminal('CORRECT! ✓', 'success');
+                    printToTerminal(`Reward: +${data.reward} $MESH`, 'success');
+                    printToTerminal(`XP Gained: +${data.xp_gained}`, 'info');
+                    flashEffect('success');
+                } else {
+                    printToTerminal('INCORRECT. Security level increased.', 'error');
+                    if (data.correct_answer) {
+                        printToTerminal(`Correct answer: ${data.correct_answer}`, 'warning');
+                    }
+                    flashEffect('error');
+                }
+
+                gameState.currentQuestionIndex++;
+                await updateAgentStatus();
+
+                setTimeout(() => {
+                    showNextQuestion();
+                }, 2000);
+            } catch (error) {
+                printToTerminal(`ANSWER SUBMISSION FAILED: ${error.message}`, 'error');
+            }
+        }
+
+        function showBalance() {
+            const balance = headerMeshBalance.textContent;
+            printToTerminal('═══════════════════════════════════════════', 'success');
+            printToTerminal(`  $MESH BALANCE: ${balance}`, 'success');
+            printToTerminal('═══════════════════════════════════════════', 'success');
+        }
+
+        async function showLeaderboard() {
+            try {
+                const data = await apiCall('/api/agent/leaderboard');
+                
+                printToTerminal('═══════════════════════════════════════════', 'info');
+                printToTerminal('  GLOBAL LEADERBOARD', 'info');
+                printToTerminal('═══════════════════════════════════════════', 'info');
+                printToTerminal('  RANK  AGENT                    $MESH     LVL', 'system');
+                printToTerminal('  ────────────────────────────────────────────', 'system');
+
+                data.agents.forEach((agent, index) => {
+                    const rank = String(index + 1).padStart(4);
+                    const name = agent.name.padEnd(20).substring(0, 20);
+                    const mesh = String(agent.mesh_balance).padStart(10);
+                    const level = String(agent.level).padStart(3);
+                    const color = agent.id === gameState.agentId ? 'success' : 'system';
+                    printToTerminal(`  ${rank}  ${name}  ${mesh}  ${level}`, color);
+                });
+
+                printToTerminal('═══════════════════════════════════════════', 'info');
+            } catch (error) {
+                printToTerminal(`LEADERBOARD FETCH FAILED: ${error.message}`, 'error');
+            }
+        }
+
+        async function deployAgent(serverId, scriptType) {
+            if (!serverId || !scriptType) {
+                printToTerminal('ERROR: Usage: deploy <server_id> <script_type>', 'error');
+                printToTerminal('Available types: miner, scanner, exploit', 'info');
+                return;
+            }
+
+            try {
+                printToTerminal('DEPLOYING AUTONOMOUS AGENT...', 'warning');
+                const data = await apiCall('/api/game/deploy', 'POST', {
+                    agent_id: gameState.agentId,
+                    server_id: parseInt(serverId),
+                    script_type: scriptType
+                });
+
+                printToTerminal('AGENT DEPLOYED SUCCESSFULLY!', 'success');
+                printToTerminal(`Agent ID: ${data.deployed_agent.id}`, 'info');
+                printToTerminal(`Duration: ${data.deployed_agent.duration}s`, 'info');
+
+                await updateAgentStatus();
+            } catch (error) {
+                printToTerminal(`DEPLOYMENT FAILED: ${error.message}`, 'error');
+            }
+        }
+
+        // UI Rendering
+        function renderDistricts() {
+            districtList.innerHTML = '';
+
+            gameState.districts.forEach((district, index) => {
+                const item = document.createElement('div');
+                item.className = 'district-item';
+
+                if (district.is_cleared) {
+                    item.classList.add('cleared');
+                } else if (district.is_locked) {
+                    item.classList.add('locked');
+                }
+
+                if (district.slug === gameState.currentDistrict) {
+                    item.classList.add('current');
+                }
+
+                const number = String(index + 1).padStart(2, '0');
+                const status = district.is_cleared ? '✓' : district.is_locked ? '🔒' : '○';
+
+                item.innerHTML = `
+                    <div class="district-name">${number} ${district.name}</div>
+                    <div class="district-baron">${district.baron_name}</div>
+                    <div class="district-status">${status}</div>
+                `;
+
+                item.addEventListener('click', () => {
+                    if (!district.is_locked) {
+                        changeDistrict(district.slug);
+                    } else {
+                        printToTerminal(`ACCESS DENIED: ${district.name} requires Level ${district.level_required}`, 'error');
+                    }
+                });
+
+                districtList.appendChild(item);
+            });
+        }
+
+        function renderTimeline() {
+            if (gameState.deployedAgents.length === 0) {
+                timelineList.innerHTML = '<div style="color: #666; font-style: italic;">No active operations...</div>';
+                return;
+            }
+
+            timelineList.innerHTML = '';
+
+            gameState.deployedAgents.forEach(agent => {
+                const item = document.createElement('div');
+                item.className = 'timeline-item';
+
+                const now = Date.now();
+                const deployedAt = new Date(agent.deployed_at).getTime();
+                const duration = agent.duration * 1000;
+                const elapsed = now - deployedAt;
+                const remaining = Math.max(0, duration - elapsed);
+                const progress = Math.min(100, (elapsed / duration) * 100);
+
+                item.innerHTML = `
+                    <div class="timeline-label">[${agent.id}] ${agent.script_type.toUpperCase()}</div>
+                    <div class="timeline-progress">
+                        <div class="timeline-progress-bar" style="width: ${progress}%"></div>
+                    </div>
+                    <div class="timeline-timer">${Math.ceil(remaining / 1000)}s</div>
+                `;
+
+                timelineList.appendChild(item);
+            });
+        }
+
+        // Visual Effects
+        function flashEffect(type) {
+            const className = type === 'success' ? 'flash-success' : 'flash-error';
+            document.body.classList.add(className);
+            setTimeout(() => {
+                document.body.classList.remove(className);
+            }, 500);
+        }
+
+        function createParticleEffect() {
+            for (let i = 0; i < 20; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'particle';
+                
+                const startX = window.innerWidth / 2 + (Math.random() - 0.5) * 200;
+                const startY = window.innerHeight / 2;
+                const drift = (Math.random() - 0.5) * 100;
+
+                particle.style.left = startX + 'px';
+                particle.style.top = startY + 'px';
+                particle.style.setProperty('--drift', drift + 'px');
+                particle.style.animation = `particle-float ${1 + Math.random()}s ease-out forwards`;
+
+                document.body.appendChild(particle);
+
+                setTimeout(() => {
+                    particle.remove();
+                }, 2000);
+            }
+        }
+
+        function showDistrictCleared() {
+            districtClearedOverlay.classList.add('show');
+            setTimeout(() => {
+                districtClearedOverlay.classList.remove('show');
+            }, 3000);
+        }
+    </script>
+</body>
+</html>

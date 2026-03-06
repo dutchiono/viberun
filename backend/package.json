@@ -1,0 +1,22 @@
+{
+  "name": "viberun-backend",
+  "version": "1.0.0",
+  "description": "VIBE://RUN - A Bitburner-inspired coding RPG backend",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "keywords": ["game", "rpg", "coding", "education"],
+  "author": "dutch iono",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "uuid": "^9.0.0",
+    "helmet": "^7.1.0",
+    "express-rate-limit": "^7.1.5",
+    "body-parser": "^1.20.2"
+  }
+}
